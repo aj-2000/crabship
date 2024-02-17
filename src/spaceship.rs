@@ -2,13 +2,16 @@ use bevy::prelude::*;
 
 use crate::{
     asset_loader::SceneAssets,
-    movement::MovingObjectBundle,
-    movement::{Acceleration, Velocity},
+    movement::{Acceleration, MovingObjectBundle, Velocity},
 };
 
 const SPACESHIP_SPEED: f32 = 50.0;
 const SPACESHIP_ROTATION_SPEED: f32 = 10.0;
 const SPACESHIP_ROLL_SPEED: f32 = 10.0;
+
+const MISSILE_RADIUS: f32 = 1.0;
+const MISSILE_SPEED: f32 = 50.0;
+const MISSILE_FORWARD_SPAWN_SCALAR: f32 = 7.5;
 
 #[derive(Component, Debug)]
 pub struct Spaceship;
@@ -20,8 +23,10 @@ pub struct SpaceshipPlugin;
 
 impl Plugin for SpaceshipPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostStartup, spawn_spaceship)
-            .add_systems(Update, spaceship_movement_controls);
+        app.add_systems(PostStartup, spawn_spaceship).add_systems(
+            Update,
+            (spaceship_movement_controls, spaceship_weapon_controls),
+        );
     }
 }
 
@@ -87,4 +92,32 @@ fn spaceship_movement_controls(
 
     // Update the spaceship's velocity based on new direction.
     velocity.value = -transform.forward() * movement;
+}
+
+fn spaceship_weapon_controls(
+    mut commands: Commands,
+    query: Query<&Transform, With<Spaceship>>,
+    scene_assets: Res<SceneAssets>,
+    keyboard_input: Res<Input<KeyCode>>,
+) {
+    let Ok(transform) = query.get_single() else {
+        return;
+    };
+
+    if keyboard_input.pressed(KeyCode::Space) {
+        commands.spawn((
+            MovingObjectBundle {
+                velocity: Velocity::new(-transform.forward() * MISSILE_SPEED),
+                acceleration: Acceleration::new(Vec3::ZERO),
+                model: SceneBundle {
+                    scene: scene_assets.missile.clone(),
+                    transform: Transform::from_translation(
+                        transform.translation + -transform.forward() * MISSILE_FORWARD_SPAWN_SCALAR,
+                    ),
+                    ..default()
+                },
+            },
+            SpaceshipMissile,
+        ));
+    }
 }
